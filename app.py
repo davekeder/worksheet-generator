@@ -10,13 +10,7 @@ from PIL import Image, ImageOps
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer,
-    Image as RLImage,
-    PageBreak,
-)
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage, PageBreak
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 ANSWER_PATTERN = re.compile(r"(?:[_\-\s])([A-Ea-e])(?=\.[^.]+$)")
@@ -54,7 +48,7 @@ class WorksheetBuilderApp:
             main,
             text=(
                 "Build a worksheet PDF from a ZIP of problem screenshots. "
-                "Use filenames like problem_12_D.png so the final letter becomes the answer key."
+                "Optional answer keys can be inferred from filenames like problem_12_D.png"
             ),
             wraplength=720,
             justify="left",
@@ -78,13 +72,9 @@ class WorksheetBuilderApp:
         options_frame.pack(fill="x", **pad)
 
         ttk.Label(options_frame, text="Problems per page:").grid(row=0, column=0, sticky="w", padx=10, pady=10)
-        ttk.Spinbox(
-            options_frame,
-            from_=1,
-            to=10,
-            textvariable=self.problems_per_page,
-            width=6,
-        ).grid(row=0, column=1, sticky="w", padx=10, pady=10)
+        ttk.Spinbox(options_frame, from_=1, to=10, textvariable=self.problems_per_page, width=6).grid(
+            row=0, column=1, sticky="w", padx=10, pady=10
+        )
 
         ttk.Checkbutton(
             options_frame,
@@ -102,12 +92,12 @@ class WorksheetBuilderApp:
         help_frame.pack(fill="x", **pad)
 
         help_text = (
-            "Recommended format: make the final letter before the extension the answer choice.\n\n"
+            "Best simple option: put the answer letter just before the file extension, preceded by an underscore, dash, or space.\n\n"
             "Examples:\n"
             "  algebra_01_A.png\n"
             "  geo-problem-12-C.jpg\n"
             "  q7 b.jpeg\n\n"
-            "Accepted answer letters: A through E."
+            "The app will read A-E automatically and place them on the final answer-key page."
         )
         ttk.Label(help_frame, text=help_text, justify="left").pack(anchor="w", padx=10, pady=10)
 
@@ -125,7 +115,8 @@ class WorksheetBuilderApp:
         if path:
             self.zip_path.set(path)
             if not self.output_path.get():
-                self.output_path.set(str(Path(path).with_suffix(".pdf")))
+                default_output = str(Path(path).with_suffix(".pdf"))
+                self.output_path.set(default_output)
 
     def choose_output(self):
         path = filedialog.asksaveasfilename(
@@ -184,7 +175,10 @@ class WorksheetBuilderApp:
         for path in extract_dir.rglob("*"):
             if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS:
                 answer = self._extract_answer_from_filename(path.name)
-                images.append({"path": path, "answer": answer})
+                images.append({
+                    "path": path,
+                    "answer": answer,
+                })
         return images
 
     @staticmethod
@@ -221,7 +215,7 @@ class WorksheetBuilderApp:
 
         elements = []
         problems_per_page = max(1, int(self.problems_per_page.get()))
-        page_width, _ = letter
+        page_width, page_height = letter
         usable_width = page_width - doc.leftMargin - doc.rightMargin
 
         with tempfile.TemporaryDirectory() as prep_dir_str:
@@ -238,14 +232,8 @@ class WorksheetBuilderApp:
                 max_image_height = 1.05 * inch if problems_per_page >= 5 else 1.5 * inch
                 scale = min(max_image_width / width_px, max_image_height / height_px)
 
-                elements.append(Paragraph(f"<b>Problem {idx}</b>", normal))
-                elements.append(
-                    RLImage(
-                        str(prepared_path),
-                        width=width_px * scale,
-                        height=height_px * scale,
-                    )
-                )
+                elements.append(Paragraph(f"<b>{idx}.)</b>", normal))
+                elements.append(RLImage(str(prepared_path), width=width_px * scale, height=height_px * scale))
 
                 spacer_height = 0.32 * inch if self.add_work_space.get() else 0.14 * inch
                 elements.append(Spacer(1, spacer_height))
@@ -264,13 +252,20 @@ class WorksheetBuilderApp:
                     for number, answer in answer_items:
                         elements.append(Paragraph(f"{number}. {answer}", normal))
                         elements.append(Spacer(1, 0.06 * inch))
-
-        doc.build(elements)
+            doc.build(elements)
 
 
 def main():
     root = tk.Tk()
-    app = WorksheetBuilderApp(root)
+    try:
+        from tkinter import TkinterDnD  # optional dependency
+        root.destroy()
+        root = TkinterDnD.Tk()
+        app = WorksheetBuilderApp(root)
+        app.status_text.set("Drag-and-drop support available if you wire it in later. Choose a ZIP file to begin.")
+    except Exception:
+        app = WorksheetBuilderApp(root)
+
     root.mainloop()
 
 
