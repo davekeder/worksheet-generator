@@ -233,7 +233,7 @@ class WorksheetBuilderApp:
                 scale = min(max_image_width / width_px, max_image_height / height_px)
 
                 elements.append(Paragraph(f"<b>{idx}.)</b>", normal))
-                elements.append(RLImage(str(prepared_path), width=width_px * scale, height=height_px * scale))
+                elements.append(RLImage(str(prepared_path), width=width_px * scale, height=height_px * scale,hAlign="LEFT"))
 
                 spacer_height = 0.32 * inch if self.add_work_space.get() else 0.14 * inch
                 elements.append(Spacer(1, spacer_height))
