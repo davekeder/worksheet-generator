@@ -1,3 +1,4 @@
+import csv
 import os
 import re
 import zipfile
@@ -26,6 +27,7 @@ class WorksheetBuilderApp:
         self.output_path = tk.StringVar()
         self.problems_per_page = tk.IntVar(value=5)
         self.include_answer_key = tk.BooleanVar(value=True)
+        self.export_error_log = tk.BooleanVar(value=True)
         self.add_work_space = tk.BooleanVar(value=True)
         self.status_text = tk.StringVar(value="Choose a ZIP file to begin.")
 
@@ -81,6 +83,12 @@ class WorksheetBuilderApp:
             text="Include answer key page",
             variable=self.include_answer_key,
         ).grid(row=1, column=0, columnspan=2, sticky="w", padx=10, pady=6)
+
+        ttk.Checkbutton(
+            options_frame,
+            text="Export error log CSV",
+            variable=self.export_error_log,
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=10, pady=6)
 
         ttk.Checkbutton(
             options_frame,
@@ -163,6 +171,10 @@ class WorksheetBuilderApp:
 
                 self._generate_pdf(images, output_path)
 
+                error_log_path = None
+                if self.export_error_log.get():
+                    error_log_path = self._generate_error_log_csv(images, output_path)
+
             self.status_text.set("Done.")
             messagebox.showinfo("Success", f"Worksheet saved to:\n{output_path}")
 
@@ -186,6 +198,16 @@ class WorksheetBuilderApp:
         match = ANSWER_PATTERN.search(filename)
         return match.group(1).upper() if match else None
 
+    def _generate_error_log_csv(self, images, output_path: str):
+        csv_path = Path(output_path).with_name(Path(output_path).stem + "_error_log.csv")
+
+        with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            for idx, item in enumerate(images, start=1):
+                writer.writerow(["worksheet", idx, "", item["answer"] or ""])
+
+        return str(csv_path)
+    
     def _prepare_image_for_pdf(self, image_path: Path, temp_dir: Path, index: int):
         out_path = temp_dir / f"prepared_{index:04d}.png"
         with Image.open(image_path) as im:
